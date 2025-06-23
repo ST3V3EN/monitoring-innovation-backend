@@ -1,10 +1,6 @@
-from sqlalchemy import Column, Integer, String
-from ..db.database import Base
+from pydantic import BaseModel, constr
 
-class Car(Base):
-    __tablename__ = "Car"
-
-    Id = Column(Integer, primary_key=True, index=True)
-    Marca = Column(String, index=True)
-    Sucursal = Column(String, unique=True, index=True)
-    Aspirante = Column(String, unique=True, index=True)
+class Car(BaseModel):
+    marca: constr(min_length=1, max_length=50)
+    sucursal: constr(min_length=1, max_length=50)
+    aspirante: constr(min_length=1, max_length=50)

@@ -1,10 +1,14 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+import os
+import asyncpg
+from dotenv import load_dotenv
 
-DATABASE_URL = "postgresql://postgres:BrayanSM%40061205@localhost:5432/monitoring_innovation"
+load_dotenv()
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+DATABASE_URL = os.getenv("DB_URL")
 
-Base = declarative_base()
+async def get_db_connection():
+    try:
+        conn = await asyncpg.connect(DATABASE_URL)
+        return conn
+    except Exception as e:
+        return None

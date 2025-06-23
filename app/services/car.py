@@ -1,23 +1,91 @@
-from sqlalchemy.orm import Session
-from app.models import car
-from app.schemas import car
+import logging
+from app.db.database import get_db_connection
+from app.schemas.car import CarCreate
+from app.schemas.car import CarRead 
 
-def create_car(db: Session, car: car.CarCreate):
-    db_car = car.Car(**car.dict())
-    db.add(db_car)
-    db.commit()
-    db.refresh(db_car)
-    return db_car
+async def create_table_service():
+    conn = await get_db_connection()
+    if conn is None:
+        return False
+    try:
+        async with conn.transaction():
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS Car (
+                    Id SERIAL PRIMARY KEY,
+                    Marca TEXT NOT NULL,
+                    Sucursal TEXT NOT NULL,
+                    Aspirante TEXT NOT NULL
+                );
+            """)
+            return True
+    except Exception as e:
+        logging.error(f"Error creating table: {e}")
+        return False
+    finally:
+        await conn.close()
 
-def get_car(db: Session, car_id: int):
-    return db.query(car.Car).filter(car.Car.Id == car_id).first()
+async def get_car(conn, car_id: int):
+    try:
+        result = await conn.fetchrow("SELECT * FROM Car WHERE id = $1", car_id)
+        return dict(result) if result else None
+    except Exception as e:
+        logging.error(f"Error getting car: {e}")
+        raise
 
-def get_cars(db: Session, skip: int = 0, limit: int = 10):
-    return db.query(car.Car).offset(skip).limit(limit).all()
+async def get_cars(conn, skip: int = 0, limit: int = 10):
+    try:
+        results = await conn.fetch("SELECT * FROM Car OFFSET $1 LIMIT $2", skip, limit)
+        return [dict(row) for row in results]
+    except Exception as e:
+        logging.error(f"Error getting cars: {e}")
+        raise
 
-def delete_car(db: Session, car_id: int):
-    car = db.query(car.Car).filter(car.Car.Id == car_id).first()
-    if car:
-        db.delete(car)
-        db.commit()
-    return car
+async def create_car(conn, car_data: CarCreate):
+    try:
+        async with conn.transaction():
+            result = await conn.fetchrow("""
+                INSERT INTO Car (marca, sucursal, aspirante)
+                VALUES ($1, $2, $3)
+                RETURNING id, marca, sucursal, aspirante
+            """, car_data.marca, car_data.sucursal, car_data.aspirante)
+            return dict(result)
+    except Exception as e:
+        logging.error(f"Error creating car: {e}")
+        raise
+
+async def update_car_service(car_id: int, car_data: CarCreate):
+    try:
+        conn = await get_db_connection()
+        async with conn.transaction():
+            result = await conn.execute(
+                """
+                UPDATE Car
+                SET marca = $1, sucursal = $2, aspirante = $3
+                WHERE id = $4
+                RETURNING *;
+                """,
+                car_data.marca, car_data.sucursal, car_data.aspirante, car_id
+            )
+            updated = await conn.fetchrow("SELECT * FROM Car WHERE id = $1", car_id)
+
+            if updated:
+                return CarRead(**dict(updated))
+            return None
+    except Exception as e:
+        logging.error(f"An error occurred while updating: {e}")
+        raise
+    finally:
+        if conn:
+            await conn.close()
+
+async def delete_car(conn, car_id: int):
+    try:
+        async with conn.transaction():
+            result = await conn.fetchrow("""
+                DELETE FROM car WHERE id = $1
+                RETURNING id, marca, sucursal, aspirante
+            """, car_id)
+            return dict(result) if result else None
+    except Exception as e:
+        logging.error(f"Error deleting car: {e}")
+        raise

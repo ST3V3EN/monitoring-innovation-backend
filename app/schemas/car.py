@@ -1,15 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-class CarBase(BaseModel):
-    Marca: str
-    Sucursal: str
-    Aspirante: str
+class CarCreate(BaseModel):
+    marca: str = Field(..., min_length=1, max_length=50)
+    sucursal: str = Field(..., min_length=1, max_length=50)
+    aspirante: str = Field(..., min_length=1, max_length=50)
 
-class CarCreate(CarBase):
-    pass
-
-class CarRead(CarBase):
-    Id: int
-
-class Config:
-    from_attributes = True
+class CarRead(BaseModel):
+    id: int
+    marca: str
+    sucursal: str
+    aspirante: str
